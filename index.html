@@ -644,17 +644,6 @@
           </div>
         </div>
 
-        <!-- AI deep review -->
-        <div style="background:#f7f1f2; border:1px solid #e6dcde; border-radius:11px; padding:13px 15px; margin-bottom:16px;">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
-            <div style="font-size:12.5px; color:#44474e;"><b style="color:#941A31;">실시간 AI 심화 검수</b> — 규칙으로 못 잡은 항목을 Claude가 추가로 제안합니다.</div>
-            <button onClick="{{ onAIReview }}" style="background:#941A31; color:#fff; border:none; border-radius:8px; padding:9px 15px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; opacity:{{ aiBtnOpacity }};">{{ aiBtnLabel }}</button>
-          </div>
-          <sc-if value="{{ hasAiNote }}" hint-placeholder-val="{{ true }}">
-            <div style="margin-top:11px; background:#fff; border:1px solid #e6dcde; border-radius:8px; padding:11px 13px; font-size:12px; color:#44474e; line-height:1.55; white-space:pre-wrap;">{{ aiNote }}</div>
-          </sc-if>
-        </div>
-
         <!-- review list -->
         <div style="display:flex; flex-direction:column; gap:9px;">
           <sc-for list="{{ reviews }}" as="r" hint-placeholder-count="8">
@@ -1378,7 +1367,7 @@ class Component extends DCLogic {
     meta:{model:'', subtitle:''}, bullets:[], dims:[], certs:{}, accessories:[], showDiversity:true, showAccessories:true, showOverview:true, showDims:true, soloLayout:'left', specStartP1:false,
     pageView:'both', zoom:0.66, zoom4:0.5, fitMode:null, dimCount:1, dimLayout:'column', showSettings:false, settingsTab:'cms',
     cmsSource:'default', cmsBusy:false, cmsNote:'', cmsError:'', defaultCms:null,
-    customOrder:{}, hiddenCats:{}, disabledRules:{}, aiBusy:false, aiNote:'', search:'', showUnmapped:false, unmapPick:{},
+    customOrder:{}, hiddenCats:{}, disabledRules:{}, search:'', showUnmapped:false, unmapPick:{},
     importing:false, importError:'', dragOver:false, importNote:'', importSource:'xlsx',
     showReports:false, reportFocus:'mapping', showExport:false, exportMsg:'', savedToast:'', hasSession:false,
     reviewFilter:null, expandedReviews:{}, sheetVersion:'reviewed', applyReview:true, applyCms:true,
@@ -3172,22 +3161,6 @@ class Component extends DCLogic {
   }
   toggleSettings(){ this.setState(s=>({showSettings:!s.showSettings})); }
   toggleUnmapped(){ this.setState(s=>({showUnmapped:!s.showUnmapped})); }
-  async aiReview(){
-    if(this.state.aiBusy) return;
-    this.setState({aiBusy:true});
-    try{
-      const m=this.buildMapping(); const lines=[];
-      m.orderedCats.forEach(c=>c.fields.forEach(f=>lines.push(f.name+': '+f.value)));
-      const prompt='You are a US/UL technical editor for AVYCON CCTV spec sheets. Review these spec field values for American English, UL voltage notation (12VDC, 24VAC), unit spacing, CCTV standard terms (microSD, PoE, IEC 62676-4 DORI noun forms), and typos. List ONLY remaining issues, max 6 lines, each formatted "Field — suggested fix". If clean, reply "추가 발견 사항 없음.".\n\n'+lines.slice(0,40).join('\n');
-      let out='';
-      // 1) 서버리스 프록시(/api/ai-review) — 배포 사이트에서 동작(ANTHROPIC_API_KEY 필요)
-      try{ const r=await fetch('/api/ai-review',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})}); if(r.ok){ out=((await r.json()).text||''); } else if(r.status===503){ out=''; } }catch(e){}
-      // 2) Claude Design 런타임 폴백(미리보기 전용)
-      if(!out && window.claude && window.claude.complete){ try{ out=await window.claude.complete(prompt); }catch(e){} }
-      this.setState({aiBusy:false, aiNote:(out||'').trim()||this.T('AI 심화 검수를 사용할 수 없습니다. (서버 키 미설정) 위의 규칙 기반 검수 결과를 사용하세요.','AI deep review is unavailable (server key not set). Use the rule-based results above.')});
-    }catch(e){ this.setState({aiBusy:false, aiNote:this.T('AI 심화 검수를 사용할 수 없습니다. 위의 규칙 기반 검수 결과를 사용하세요.','AI deep review is unavailable. Use the rule-based results above.')}); }
-  }
-
   renderVals(){
     const st=this.state;
     const stepDefs=[
@@ -3597,8 +3570,6 @@ class Component extends DCLogic {
       out.appliedCount=allReviews.filter(r=>this.accepted(r.key)).length;
       out.onAcceptAll=()=>this.acceptAll(); out.onRejectAll=()=>this.rejectAll();
       out.onBackTo1=()=>this.goStep(1); out.onToStep3=()=>this.goStep(3); out.onToStep4=()=>this.goStep(4);
-      out.aiBusy=st.aiBusy; out.aiBtnLabel=st.aiBusy?'검수 중…':'🔄 AI 심화 검수 실행'; out.aiBtnOpacity=st.aiBusy?'.6':'1';
-      out.onAIReview=()=>this.aiReview(); out.aiNote=st.aiNote; out.hasAiNote=!!st.aiNote;
 
       // sheet — 기존버전(raw) vs 수정버전(review±cms 선택)
       const rev=st.sheetVersion!=='raw';
